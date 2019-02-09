@@ -1,6 +1,7 @@
 package it.trenzalore.utils.config
 
 import com.typesafe.config.Config
+
 import scala.collection.JavaConversions._
 
 object TypesafeConfigUtils {
@@ -23,7 +24,7 @@ object TypesafeConfigUtils {
         .entrySet()
         .map { entry ⇒
           val key = entry.getKey.replaceFirst("\\.value$", "")
-          val valueAsString = entry.getValue.unwrapped().asInstanceOf[String]
+          val valueAsString = entry.getValue.unwrapped().toString
           key -> valueAsString
         }
         .toMap

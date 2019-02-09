@@ -1,7 +1,8 @@
 package it.trenzalore.utils.spark
 
 import com.typesafe.config.ConfigFactory
-import it.trenzalore.utils.spark.io.SourceConfig
+import it.trenzalore.utils.spark.io.{ SourceConfig, SourceManager }
+import org.apache.spark.sql.SaveMode
 import org.scalatest.{ FunSuite, GivenWhenThen, Matchers }
 
 class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
@@ -18,6 +19,20 @@ class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
         |  source2 {
         |    path = "source2_path"
         |    format = "json"
+        |    delimiter = ";"
+        |    header = true
+        |    partitions = ["part1", "part2"]
+        |    table = "some_table"
+        |    saveMode = "Overwrite"
+        |    createExternalTable = true
+        |    readOptions {
+        |      r_option_1 = "r_value_1"
+        |      r_option_2 = 42
+        |    }
+        |    writeOptions {
+        |      w_option_1 = "w_value_1"
+        |      w_option_2 = false
+        |    }
         |  }
         |}
       """.stripMargin
@@ -28,8 +43,36 @@ class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
     val sourceConfigs: Map[String, SourceConfig] = SourceManager.parseSourceConfigs(config)
 
     Then("sources config should be indexed and typed")
-    sourceConfigs("source1") should be(SourceConfig(path = "source1_path", format = FileFormat.ORC))
-    sourceConfigs("source2") should be(SourceConfig(path = "source2_path", format = FileFormat.Json))
+    sourceConfigs("source1") should be(SourceConfig(
+      path = "source1_path",
+      format = FileFormat.ORC,
+      delimiter = None,
+      header = None,
+      partitions = Vector(),
+      table = None,
+      saveMode = None,
+      createExternalTable = false,
+      readOptions = Map(),
+      writeOptions = Map()
+    ))
+    sourceConfigs("source2") should be(SourceConfig(
+      path = "source2_path",
+      format = FileFormat.Json,
+      delimiter = Some(";"),
+      header = Some(true),
+      partitions = Vector("part1", "part2"),
+      table = Some("some_table"),
+      saveMode = Some(SaveMode.Overwrite),
+      createExternalTable = true,
+      readOptions = Map(
+        "r_option_1" -> "r_value_1",
+        "r_option_2" -> "42"
+      ),
+      writeOptions = Map(
+        "w_option_1" -> "w_value_1",
+        "w_option_2" -> "false"
+      )
+    ))
   }
 
 }

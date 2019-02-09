@@ -12,7 +12,7 @@ class TypesafeConfigUtilsTest extends FlatSpec with Matchers with GivenWhenThen 
     val config = ConfigFactory.parseMap(Map(
       "wrapper.inner.value" -> "no_more_value",
       "wrapper.inner.name" -> "toto",
-      "wrapper.inner.age" -> "42"
+      "wrapper.inner.age" -> 42
     ))
 
     When("getting all inner config to a Map")
