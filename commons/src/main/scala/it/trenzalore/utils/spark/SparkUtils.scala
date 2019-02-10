@@ -44,8 +44,12 @@ object SparkUtils {
     }
   }
 
+  def schemaOf[T <: Product: TypeTag]: StructType = {
+    Encoders.product[T].schema
+  }
+
   def columnsOf[T <: Product: TypeTag]: Seq[Column] = {
-    Encoders.product[T].schema.fieldNames.map(col)
+    schemaOf[T].fieldNames.map(col)
   }
 
 }

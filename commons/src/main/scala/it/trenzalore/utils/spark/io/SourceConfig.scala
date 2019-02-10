@@ -3,7 +3,6 @@ package it.trenzalore.utils.spark.io
 import com.typesafe.config.Config
 import it.trenzalore.utils.spark.FileFormat
 import net.ceedubs.ficus.Ficus._
-import org.apache.spark.sql.SaveMode
 
 case class SourceConfig(
   path:                String,
@@ -27,7 +26,7 @@ object SourceConfig {
     header = config.as[Option[Boolean]]("header"),
     partitions = config.as[Option[Vector[String]]]("partitions").getOrElse(Vector.empty),
     table = config.as[Option[String]]("table"),
-    saveMode = config.as[Option[String]]("saveMode").map(SaveMode.valueOf),
+    saveMode = config.as[Option[String]]("saveMode").map(SaveMode.apply),
     createExternalTable = config.as[Option[Boolean]]("createExternalTable").getOrElse(false),
     readOptions = config.as[Option[Map[String, String]]]("readOptions").getOrElse(Map.empty),
     writeOptions = config.as[Option[Map[String, String]]]("writeOptions").getOrElse(Map.empty)

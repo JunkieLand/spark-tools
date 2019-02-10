@@ -1,8 +1,7 @@
 package it.trenzalore.utils.spark
 
 import com.typesafe.config.ConfigFactory
-import it.trenzalore.utils.spark.io.{ SourceConfig, SourceManager }
-import org.apache.spark.sql.SaveMode
+import it.trenzalore.utils.spark.io.{ SaveMode, SourceConfig, SourceManager }
 import org.scalatest.{ FunSuite, GivenWhenThen, Matchers }
 
 class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {

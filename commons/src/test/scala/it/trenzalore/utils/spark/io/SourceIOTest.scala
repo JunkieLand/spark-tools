@@ -1,0 +1,266 @@
+package it.trenzalore.utils.spark.io
+
+import java.io.File
+
+import com.renault.hercules.traceability.DataFrameSuiteBase
+import it.trenzalore.utils.spark.FileFormat
+import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.FileSystem
+import org.apache.spark.sql.AnalysisException
+import org.scalatest.{ BeforeAndAfterAll, BeforeAndAfterEach, FunSuite, GivenWhenThen, Matchers }
+
+class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with BeforeAndAfterEach with BeforeAndAfterAll with DataFrameSuiteBase {
+
+  import spark.implicits._
+  implicit val fs = FileSystem.get(spark.sparkContext.hadoopConfiguration)
+
+  override protected def beforeEach(): Unit = {
+    super.beforeEach()
+    deleteDir("/tmp/sourceiotest")
+  }
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    deleteDir("/tmp/sourceiotest")
+    fs.close()
+  }
+
+  test("Save mode Overwrite should write dataset in non existing directory") {
+    Given("a dataset and a source configuration with Overwrite save mode")
+    val dudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwrite",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.Overwrite)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Overwrite should write dataset in existing directory") {
+    Given("a dataset and a source configuration with Overwrite save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteOldDudes",
+      format = FileFormat.CSV,
+      createExternalTable = false,
+      header = Some(true),
+      delimiter = Some("|"),
+      saveMode = Some(SaveMode.Overwrite)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory with only the writen data")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Append should write dataset in non existing directory") {
+    Given("a dataset and a source configuration with Append save mode")
+    val dudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withAppend",
+      format = FileFormat.Parquet,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.Append)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Append should write dataset in existing directory") {
+    Given("a dataset and a source configuration with Overwrite save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withAppendOldDudes",
+      format = FileFormat.ORC,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.Append)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory with old and new data")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain allElementsOf dudes
+    res should contain allElementsOf oldDudes
+  }
+
+  test("Save mode Ignore should not write dataset in not existing directory") {
+    Given("a dataset and a source configuration with Ignore save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withIgnoreDudes",
+      format = FileFormat.ORC,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.Ignore)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory with old data")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Ignore should not write dataset in existing directory") {
+    Given("a dataset and a source configuration with Ignore save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withIgnoreDudes",
+      format = FileFormat.ORC,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.Ignore)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory with old data")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs oldDudes
+  }
+
+  test("Save mode ErrorIfExists should write dataset if not existing directory") {
+    Given("a dataset and a source configuration with ErrorIfExists save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withErrorIfNotExistsDudes",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.ErrorIfExists)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode ErrorIfExists should raise error if existing directory") {
+    Given("a dataset and a source configuration with Ignore save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withErrorIfExistsDudes",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.ErrorIfExists)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    val exception = intercept[AnalysisException](sourceIO.save(dudes.toDS))
+
+    Then("an error should be raised")
+    exception.getMessage() should be("path file:/tmp/sourceiotest/withErrorIfExistsDudes already exists.;")
+  }
+
+  test("Save mode OverwriteWhenSuccessful should write with intermediate temporary dir if no existing target") {
+    Given("a dataset and a source configuration with Overwrite save mode")
+    val dudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessful",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwriteWhenSuccessful should write with intermediate temporary dir if existing target") {
+    Given("a dataset and a source configuration with Overwrite save mode")
+    val dudes = Seq(Dude(name = "Rocco", age = 69), Dude(name = "Alicia", age = 14))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulOldDudes",
+      format = FileFormat.CSV,
+      createExternalTable = false,
+      header = Some(true),
+      delimiter = Some("|"),
+      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18), Dude(name = "Neo", age = 42))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory with only the writen data")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  private def deleteDir(path: String) = FileUtils.deleteDirectory(new File(path))
+
+}
+
+case class Dude(name: String, age: Int)
