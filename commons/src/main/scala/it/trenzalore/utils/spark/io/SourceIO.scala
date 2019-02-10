@@ -1,10 +1,11 @@
 package it.trenzalore.utils.spark.io
 
 import it.trenzalore.utils.logging.Logging
+import it.trenzalore.utils.spark.io.SaveMode.{Append, ErrorIfExists, Ignore, Overwrite, OverwritePartitions, OverwriteWhenSuccessful}
 import it.trenzalore.utils.spark.io.reader.SourceReader
 import it.trenzalore.utils.spark.io.writer.SourceWriter
-import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.sql.{ DataFrame, Dataset, SparkSession }
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -23,16 +24,22 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
     SourceReader.getReader(sourceConfig.format).loadDf(sourceConfig)
   }
 
-  def save[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+  def save[T](ds: Dataset[T])(implicit spark: SparkSession, fs: FileSystem): Unit = {
     logger.info(s"Saving source '$sourceName' with configuration '$sourceConfig'")
 
     sourceConfig.saveMode.get match {
-      case SaveMode.OverwriteWhenSuccessful ⇒ saveWithOverwriteWhenSuccessful(ds)
-      case SaveMode.OverwritePartitions if sourceConfig.partitions.isEmpty ⇒ saveWithOverwriteWhenSuccessful(ds)
-      case SaveMode.OverwritePartitions if sourceDirNonEmptyWithNoPartitions ⇒ saveWithOverwriteWhenSuccessful(ds)
-      case SaveMode.OverwritePartitions if sourceConfig.partitions.nonEmpty ⇒ saveWithOverwritePartitions(ds)
-      case _ ⇒ SourceWriter.getWriter(sourceConfig.format).save(ds, sourceConfig)
+      case OverwriteWhenSuccessful ⇒ saveWithOverwriteWhenSuccessful(ds)
+      case OverwritePartitions     ⇒ saveWithOverwritePartitions(ds)
+      case _                       ⇒ SourceWriter.getWriter(sourceConfig.format).save(ds, sourceConfig)
     }
+
+    if (sourceConfig.createExternalTable)
+      createOrUpdateTable()
+  }
+
+  def delete()(implicit fs: FileSystem): Boolean = {
+    logger.info(s"Deleting directory ${sourceConfig.path} for source '$sourceName'")
+    fs.delete(new Path(sourceConfig.path), true)
   }
 
   private def saveWithOverwriteWhenSuccessful[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
@@ -40,7 +47,12 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
   }
 
   private def saveWithOverwritePartitions[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
-    saveWithIntermediateTempDir(ds, replacePartitions)
+    if (sourceConfig.partitions.isEmpty)
+      throw new IllegalArgumentException("Partitions are required to use OverwritePartitions save mode.")
+    if (sourceDirNonEmptyWithNoPartitions)
+      saveWithOverwriteWhenSuccessful(ds)
+    else
+      saveWithIntermediateTempDir(ds, replacePartitions)
   }
 
   private def saveWithIntermediateTempDir[T](
@@ -49,7 +61,7 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
   )(implicit fs: FileSystem): Unit = {
     val tmpSourceConfig = sourceConfig.copy(
       path = sourceConfig.path + "_" + Random.nextString(20),
-      saveMode = Some(SaveMode.Overwrite)
+      saveMode = Some(Overwrite)
     )
     try {
       SourceWriter.getWriter(sourceConfig.format).save(ds, tmpSourceConfig)
@@ -109,14 +121,43 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
     dirExists && fileStatuses.nonEmpty && fileStatuses.forall(_.isFile)
   }
 
-  def delete()(implicit fs: FileSystem): Boolean = {
-    logger.info(s"Deleting directory ${sourceConfig.path} for source '$sourceName'")
-    fs.delete(new Path(sourceConfig.path), true)
-  }
-
   private def delete(path: String)(implicit fs: FileSystem): Boolean = {
     logger.info(s"Deleting directory $path")
     fs.delete(new Path(path), true)
+  }
+
+  private def createOrUpdateTable()(implicit spark: SparkSession): Unit = {
+    if (sourceConfig.table.isEmpty)
+      throw new IllegalArgumentException("'table' should be provided to use 'createExternalTable'")
+    val table = sourceConfig.table.get
+    val saveMode = sourceConfig.saveMode.get
+    val tableExists = spark.catalog.tableExists(table)
+
+    if (saveMode == Overwrite || saveMode == OverwriteWhenSuccessful) {
+      dropTable(table)
+      createTable(table)
+      updateTable(table)
+    } else if (!tableExists && Vector(OverwritePartitions, Append, Ignore, ErrorIfExists).contains(saveMode)) {
+      createTable(table)
+      updateTable(table)
+    } else if (tableExists && Vector(OverwritePartitions, Append).contains(saveMode)) {
+      updateTable(table)
+    }
+  }
+
+  private def dropTable(table: String)(implicit spark: SparkSession) = {
+    val tableIdentifier = spark.sessionState.sqlParser.parseTableIdentifier(table)
+    spark.sessionState.catalog.dropTable(name = tableIdentifier, ignoreIfNotExists = true, purge = false)
+  }
+
+  private def createTable(table: String)(implicit spark: SparkSession) = {
+    spark.catalog.createTable(table, sourceConfig.path, sourceConfig.format.toString.toLowerCase())
+  }
+
+  private def updateTable(table: String)(implicit spark: SparkSession) = {
+    spark.catalog.refreshTable(table)
+    if (sourceConfig.partitions.nonEmpty)
+      spark.catalog.recoverPartitions(table)
   }
 
 }

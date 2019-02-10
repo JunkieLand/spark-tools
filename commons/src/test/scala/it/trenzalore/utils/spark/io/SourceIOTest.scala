@@ -1,13 +1,19 @@
 package it.trenzalore.utils.spark.io
 
 import java.io.File
+import java.net.URI
 
 import com.renault.hercules.traceability.DataFrameSuiteBase
 import it.trenzalore.utils.spark.FileFormat
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.FileSystem
-import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.{ AnalysisException, Dataset }
 import org.scalatest.{ BeforeAndAfterAll, BeforeAndAfterEach, FunSuite, GivenWhenThen, Matchers }
+import it.trenzalore.utils.spark.SparkUtils.implicits._
+import it.trenzalore.utils.spark.SparkUtils._
+import org.apache.spark.sql.catalyst.catalog.CatalogDatabase
+
+import scala.reflect.runtime.universe.TypeTag
 
 class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with BeforeAndAfterEach with BeforeAndAfterAll with DataFrameSuiteBase {
 
@@ -17,11 +23,14 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
   override protected def beforeEach(): Unit = {
     super.beforeEach()
     deleteDir("/tmp/sourceiotest")
+    dropTestDb()
+    createTestDb()
   }
 
   override protected def afterAll(): Unit = {
     super.afterAll()
     deleteDir("/tmp/sourceiotest")
+    dropTestDb()
     fs.close()
   }
 
@@ -311,7 +320,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
     )
   }
 
-  test("Save mode OverwritePartitions should switch to OverwriteWhenSuccessful if no partitions are set") {
+  test("Save mode OverwritePartitions should raise error if no partitions are set") {
     Given("a dataset and a source configuration with OverwritePartitions save mode and no partitions")
     val dudes = Seq(Dude(name = "John", age = 18, height = 100), Dude(name = "Neo", age = 42, height = 100))
 
@@ -325,11 +334,10 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
     val sourceIO = new SourceIO("dude", sourceConfig)
 
     When("saving the dataset")
-    sourceIO.save(dudes.toDS)
+    val exception = intercept[IllegalArgumentException](sourceIO.save(dudes.toDS))
 
     Then("the dataset should be readable from the targeted directory")
-    val res = sourceIO.loadDs[Dude]().collect()
-    res should contain theSameElementsAs dudes
+    exception.getMessage should be("Partitions are required to use OverwritePartitions save mode.")
   }
 
   test("Save mode OverwritePartitions should overwrite everything if no partitions are present in target") {
@@ -348,8 +356,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
 
     And("data without partitions already present in the target directory")
     val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
-    val sourceIOWithoutPartition = new SourceIO("dudeNoPartition", sourceConfig.copy(partitions = Nil))
-    sourceIOWithoutPartition.save(oldDudes.toDS())
+    oldDudes.toDS().write.json(sourceConfig.path)
 
     When("saving the dataset")
     sourceIO.save(dudes.toDS)
@@ -360,10 +367,269 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
     directoryContainsFiles(sourceConfig.path, "json") should be(false)
   }
 
+  test("Save mode Overwrite and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with Overwrite save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteNoExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withOverwriteNoExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.Overwrite)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withOverwriteNoExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Overwrite and createExternalTable should recreate table if exists") {
+    Given("a dataset and a source configuration with Overwrite save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withOverwriteExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.Overwrite)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("an existing table")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withOverwriteExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Append and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with Append save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withAppendNoExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withAppendNoExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.Append)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withAppendNoExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode Append and createExternalTable should refresh table if exists") {
+    Given("a dataset and a source configuration with Append save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withAppendExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withAppendExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.Append)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("an existing table")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withAppendExistingCreateExternalTable")
+    res should contain allElementsOf dudes
+    res should contain allElementsOf oldDudes
+    res.size should be(4)
+  }
+
+  test("Save mode Ignore and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with Ignore save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withIgnoreNoExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withIgnoreNoExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.Ignore)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withIgnoreNoExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode ErrorIfExists and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with ErrorIfExists save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withErrorIfExistsExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withErrorIfExistsExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.ErrorIfExists)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withErrorIfExistsExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwriteWhenSuccessful and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with OverwriteWhenSuccessful save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulNoExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withOverwriteWhenSuccessfulNoExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withOverwriteWhenSuccessfulNoExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwriteWhenSuccessful and createExternalTable should recreate table if exists") {
+    Given("a dataset and a source configuration with OverwriteWhenSuccessful save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      createExternalTable = true,
+      table = Some("withOverwriteWhenSuccessfulExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("an existing table")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withOverwriteWhenSuccessfulExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwritePartitions and createExternalTable should create table if not exists") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwritePartitionsNoExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      partitions = Seq("name", "age"),
+      createExternalTable = true,
+      table = Some("withOverwritePartitionsNoExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("withOverwritePartitionsNoExistingCreateExternalTable")
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwritePartitions and createExternalTable should refresh table if exists") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode and createExternalTable")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwritePartitionsExistingCreateExternalTable",
+      format = FileFormat.Parquet,
+      partitions = Seq("name", "age"),
+      createExternalTable = true,
+      table = Some("test.withOverwritePartitionsExistingCreateExternalTable"),
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("an existing table")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the table should be readable")
+    val res = readTable[Dude]("test.withOverwritePartitionsExistingCreateExternalTable")
+    res should contain allElementsOf Seq(
+      Dude(name = "Neo", age = 42, height = 100),
+      Dude(name = "Alicia", age = 14, height = 100),
+      Dude(name = "John", age = 18, height = 10)
+    )
+  }
+
   private def deleteDir(path: String) = FileUtils.deleteDirectory(new File(path))
 
   private def directoryContainsFiles(dir: String, fileExtension: String): Boolean = {
     new File(dir).list().exists(_.endsWith(s".$fileExtension"))
+  }
+
+  private def readTable[T <: Product: TypeTag](table: String): Seq[T] = {
+    spark.read.table(table).to[T].collect()
+  }
+
+  private def dropTestDb() = {
+    spark.sessionState.catalog.dropDatabase(db = "test", ignoreIfNotExists = true, cascade = true)
+  }
+
+  private def createTestDb() = {
+    spark.sessionState.catalog.createDatabase(
+      CatalogDatabase("test", "", new URI("file:/home/nico/Projects/Perso/spark-tools/commons/spark-warehouse"), Map()),
+      true
+    )
   }
 
 }

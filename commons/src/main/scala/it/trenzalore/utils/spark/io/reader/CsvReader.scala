@@ -10,6 +10,9 @@ import scala.reflect.runtime.universe.TypeTag
 object CsvReader extends SourceReader {
 
   override def loadDf(sourceConfig: SourceConfig)(implicit spark: SparkSession): DataFrame = {
+    if (sourceConfig.delimiter.isEmpty || sourceConfig.header.isEmpty)
+      throw new IllegalArgumentException("'delimiter' and 'header' should be provided to read CSV")
+
     spark
       .read
       .options(sourceConfig.readOptions)
@@ -19,6 +22,9 @@ object CsvReader extends SourceReader {
   }
 
   override def loadDs[T <: Product: TypeTag](sourceConfig: SourceConfig)(implicit spark: SparkSession): Dataset[T] = {
+    if (sourceConfig.delimiter.isEmpty || sourceConfig.header.isEmpty)
+      throw new IllegalArgumentException("'delimiter' and 'header' should be provided to read CSV")
+
     spark
       .read
       .options(sourceConfig.readOptions)
