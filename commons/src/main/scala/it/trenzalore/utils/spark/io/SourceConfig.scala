@@ -10,8 +10,8 @@ case class SourceConfig(
   delimiter:           Option[String]      = None,
   header:              Option[Boolean]     = None,
   partitions:          Seq[String]         = Seq.empty,
-  table:               Option[String]      = None,
   saveMode:            Option[SaveMode]    = None,
+  table:               Option[String]      = None,
   createExternalTable: Boolean,
   readOptions:         Map[String, String] = Map(),
   writeOptions:        Map[String, String] = Map()
@@ -25,8 +25,8 @@ object SourceConfig {
     delimiter = config.as[Option[String]]("delimiter"),
     header = config.as[Option[Boolean]]("header"),
     partitions = config.as[Option[Vector[String]]]("partitions").getOrElse(Vector.empty),
-    table = config.as[Option[String]]("table"),
     saveMode = config.as[Option[String]]("saveMode").map(SaveMode.apply),
+    table = config.as[Option[String]]("table"),
     createExternalTable = config.as[Option[Boolean]]("createExternalTable").getOrElse(false),
     readOptions = config.as[Option[Map[String, String]]]("readOptions").getOrElse(Map.empty),
     writeOptions = config.as[Option[Map[String, String]]]("writeOptions").getOrElse(Map.empty)

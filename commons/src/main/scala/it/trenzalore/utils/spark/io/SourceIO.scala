@@ -6,6 +6,8 @@ import it.trenzalore.utils.spark.io.writer.SourceWriter
 import org.apache.hadoop.fs.{ FileSystem, Path }
 import org.apache.spark.sql.{ DataFrame, Dataset, SparkSession }
 
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Random
 
@@ -21,32 +23,90 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
     SourceReader.getReader(sourceConfig.format).loadDf(sourceConfig)
   }
 
-  def save[T <: Product: TypeTag](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+  def save[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
     logger.info(s"Saving source '$sourceName' with configuration '$sourceConfig'")
 
-    val writer = SourceWriter.getWriter(sourceConfig.format)
-
     sourceConfig.saveMode.get match {
-      case SaveMode.OverwriteWhenSuccessful ⇒
-        val tmpSourceConfig = sourceConfig.copy(
-          path = sourceConfig.path + "_" + Random.nextString(20),
-          saveMode = Some(SaveMode.Overwrite)
-        )
-        try {
-          writer.save(ds, tmpSourceConfig)
-          replaceDir(tmpSourceConfig.path, sourceConfig.path)
-        } finally {
-          delete(tmpSourceConfig.path)
-        }
-
-      case _ ⇒
-        writer.save(ds, sourceConfig)
+      case SaveMode.OverwriteWhenSuccessful ⇒ saveWithOverwriteWhenSuccessful(ds)
+      case SaveMode.OverwritePartitions if sourceConfig.partitions.isEmpty ⇒ saveWithOverwriteWhenSuccessful(ds)
+      case SaveMode.OverwritePartitions if sourceDirNonEmptyWithNoPartitions ⇒ saveWithOverwriteWhenSuccessful(ds)
+      case SaveMode.OverwritePartitions if sourceConfig.partitions.nonEmpty ⇒ saveWithOverwritePartitions(ds)
+      case _ ⇒ SourceWriter.getWriter(sourceConfig.format).save(ds, sourceConfig)
     }
   }
 
-  def replaceDir(fromDir: String, toDir: String)(implicit fs: FileSystem): Unit = {
-    fs.delete(new Path(toDir), true)
-    fs.rename(new Path(fromDir), new Path(toDir))
+  private def saveWithOverwriteWhenSuccessful[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+    saveWithIntermediateTempDir(ds, replaceDirectory)
+  }
+
+  private def saveWithOverwritePartitions[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+    saveWithIntermediateTempDir(ds, replacePartitions)
+  }
+
+  private def saveWithIntermediateTempDir[T](
+    ds:           Dataset[T],
+    moveStrategy: (Path, Path) ⇒ Unit
+  )(implicit fs: FileSystem): Unit = {
+    val tmpSourceConfig = sourceConfig.copy(
+      path = sourceConfig.path + "_" + Random.nextString(20),
+      saveMode = Some(SaveMode.Overwrite)
+    )
+    try {
+      SourceWriter.getWriter(sourceConfig.format).save(ds, tmpSourceConfig)
+      moveStrategy(new Path(tmpSourceConfig.path), new Path(sourceConfig.path))
+    } finally {
+      delete(tmpSourceConfig.path)
+    }
+  }
+
+  private def replaceDirectory(fromDir: Path, toDir: Path)(implicit fs: FileSystem): Unit = {
+    fs.delete(toDir, true)
+    fs.rename(fromDir, toDir)
+  }
+
+  private def replacePartitions(fromDir: Path, toDir: Path)(implicit fs: FileSystem): Unit = {
+    val iterator = fs.listFiles(fromDir, true)
+    val partitionPaths = mutable.Set[Path]()
+
+    while (iterator.hasNext) {
+      val fileStatus = iterator.next()
+      val path = fileStatus.getPath
+
+      if (fileStatus.isFile && path.getName != "_SUCCESS") {
+        partitionPaths += path.getParent
+      }
+    }
+
+    partitionPaths
+      .flatMap { partitionPath ⇒
+        getPartitionSubPath(fromDir, partitionPath).map(subPath ⇒ partitionPath -> subPath)
+      }.foreach {
+        case (fromPartitionPath, fromPartitionSubPath) ⇒
+          replaceDirectory(fromPartitionPath, new Path(toDir, fromPartitionSubPath))
+      }
+  }
+
+  private def getPartitionSubPath(rootDir: Path, fullDir: Path): Option[Path] = {
+    @tailrec
+    def loop(currentDir: Path, partitionDir: Option[Path] = None): Option[Path] = {
+      if (currentDir.depth() == rootDir.depth()) {
+        partitionDir
+      } else {
+        val newCurrentDir = currentDir.getParent
+        val newPartitionDir = partitionDir
+          .map(p ⇒ new Path(currentDir.getName, p))
+          .getOrElse(new Path(currentDir.getName))
+        loop(newCurrentDir, Some(newPartitionDir))
+      }
+    }
+    loop(fullDir)
+  }
+
+  private def sourceDirNonEmptyWithNoPartitions(implicit fs: FileSystem): Boolean = {
+    val sourcePath = new Path(sourceConfig.path)
+    val dirExists = fs.exists(sourcePath)
+    lazy val fileStatuses = fs.listStatus(sourcePath)
+    dirExists && fileStatuses.nonEmpty && fileStatuses.forall(_.isFile)
   }
 
   def delete()(implicit fs: FileSystem): Boolean = {

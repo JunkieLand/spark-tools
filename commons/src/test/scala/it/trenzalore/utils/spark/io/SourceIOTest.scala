@@ -238,7 +238,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
 
     val sourceConfig = SourceConfig(
       path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulOldDudes",
-      format = FileFormat.CSV,
+      format = FileFormat.Json,
       createExternalTable = false,
       header = Some(true),
       delimiter = Some("|"),
@@ -259,8 +259,113 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
     res should contain theSameElementsAs dudes
   }
 
+  test("Save mode OverwritePartitions should write dataset if no existing target") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode")
+    val dudes = Seq(Dude(name = "John", age = 18, height = 100), Dude(name = "Neo", age = 42, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwritePartitions",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      partitions = Vector("name", "age"),
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwritePartitions should overwrite only added partitions if existing target") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulOldDudes",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      partitions = Vector("name", "age"),
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    sourceIO.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable with old partitions not present in new ones, plus new ones")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs Seq(
+      Dude(name = "Neo", age = 42, height = 100),
+      Dude(name = "Alicia", age = 14, height = 100),
+      Dude(name = "John", age = 18, height = 10)
+    )
+  }
+
+  test("Save mode OverwritePartitions should switch to OverwriteWhenSuccessful if no partitions are set") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode and no partitions")
+    val dudes = Seq(Dude(name = "John", age = 18, height = 100), Dude(name = "Neo", age = 42, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteNoPartitions",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable from the targeted directory")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+  }
+
+  test("Save mode OverwritePartitions should overwrite everything if no partitions are present in target") {
+    Given("a dataset and a source configuration with OverwritePartitions save mode")
+    val dudes = Seq(Dude(name = "Neo", age = 42, height = 100), Dude(name = "Alicia", age = 14, height = 100))
+
+    val sourceConfig = SourceConfig(
+      path = "/tmp/sourceiotest/withOverwriteWhenSuccessfulOldDudes",
+      format = FileFormat.Json,
+      createExternalTable = false,
+      partitions = Vector("name"),
+      saveMode = Some(SaveMode.OverwritePartitions)
+    )
+
+    val sourceIO = new SourceIO("dude", sourceConfig)
+
+    And("data without partitions already present in the target directory")
+    val oldDudes = Seq(Dude(name = "John", age = 18, height = 10), Dude(name = "Neo", age = 42, height = 10))
+    val sourceIOWithoutPartition = new SourceIO("dudeNoPartition", sourceConfig.copy(partitions = Nil))
+    sourceIOWithoutPartition.save(oldDudes.toDS())
+
+    When("saving the dataset")
+    sourceIO.save(dudes.toDS)
+
+    Then("the dataset should be readable with old partitions not present in new ones, plus new ones")
+    val res = sourceIO.loadDs[Dude]().collect()
+    res should contain theSameElementsAs dudes
+    directoryContainsFiles(sourceConfig.path, "json") should be(false)
+  }
+
   private def deleteDir(path: String) = FileUtils.deleteDirectory(new File(path))
+
+  private def directoryContainsFiles(dir: String, fileExtension: String): Boolean = {
+    new File(dir).list().exists(_.endsWith(s".$fileExtension"))
+  }
 
 }
 
-case class Dude(name: String, age: Int)
+case class Dude(name: String, age: Int, height: Int = 0)

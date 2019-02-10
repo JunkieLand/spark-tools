@@ -27,6 +27,9 @@ object SaveMode extends Enum[SaveMode] {
   case object OverwriteWhenSuccessful extends SaveMode {
     def toSparkSaveMode: sql.SaveMode = throw new IllegalAccessException("OverwriteWhenSuccessful has no Spark equivalent save mode")
   }
+  case object OverwritePartitions extends SaveMode {
+    def toSparkSaveMode: sql.SaveMode = throw new IllegalAccessException("OverwriteWhenSuccessful has no Spark equivalent save mode")
+  }
 
   def apply(str: String): SaveMode = withNameInsensitive(str)
 
