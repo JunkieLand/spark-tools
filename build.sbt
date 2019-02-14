@@ -1,8 +1,9 @@
 
-lazy val sparkTools = RootProject(file("spark-tools"))
+lazy val sparkUtils = RootProject(file("spark-utils"))
+lazy val sparkSourceManager = RootProject(file("spark-source-manager"))
 
 
-lazy val traceability =
+lazy val sparkTools =
   project
     .in(file("."))
-    .aggregate(sparkTools)
+    .aggregate(sparkUtils, sparkSourceManager)

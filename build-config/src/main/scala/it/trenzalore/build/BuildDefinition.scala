@@ -9,18 +9,6 @@ object BuildDefinition {
 
   import Implicits._
 
-  def sparkApp(name: String, publication: Publication = Assembly, isSparkProvided: Boolean = true) = {
-    basicApp(name, publication).settings(
-      libraryDependencies ++= Dependencies.sparkDependencies(isSparkProvided)
-    )
-  }
-
-  def basicApp(name: String, publication: Publication = Assembly) = {
-    library(name, publication).settings(
-      libraryDependencies ++= Dependencies.appDedendencies
-    )
-  }
-
   def library(name: String, publication: Publication = Assembly) = {
     Project(name, new File("."))
       .settings(
