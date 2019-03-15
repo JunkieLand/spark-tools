@@ -31,6 +31,8 @@ class SourceManager(config: Config) {
 
 object SourceManager extends Logging {
 
+  def apply(config: Config): SourceManager = new SourceManager(config)
+
   def parseSourceConfigs(config: Config): Map[String, SourceConfig] = {
     if (!config.hasPath("sources"))
       throw new IllegalArgumentException("SourceManager expects a 'sources' entry in the configuration")
