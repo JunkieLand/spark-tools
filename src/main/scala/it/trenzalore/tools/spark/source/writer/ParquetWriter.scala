@@ -25,7 +25,7 @@ object ParquetWriter extends SourceWriter {
       .write
       .options(sourceConfig.writeOptions)
       .partitionBy(sourceConfig.partitions: _*)
-      .mode(sourceConfig.saveMode.get.toSparkSaveMode)
+      .mode(sourceConfig.writeStrategy.get.toSparkSaveMode)
       .parquet(sourceConfig.path)
   }
 

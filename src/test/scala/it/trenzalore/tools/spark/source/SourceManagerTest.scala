@@ -21,7 +21,7 @@ class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
         |    header = true
         |    partitions = ["part1", "part2"]
         |    table = "some_table"
-        |    saveMode = "Overwrite"
+        |    writeStrategy = "Overwrite"
         |    createExternalTable = true
         |    readOptions {
         |      r_option_1 = "r_value_1"
@@ -48,7 +48,7 @@ class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
       header = None,
       partitions = Vector(),
       table = None,
-      saveMode = None,
+      writeStrategy = None,
       createExternalTable = false,
       readOptions = Map(),
       writeOptions = Map()
@@ -60,7 +60,7 @@ class SourceManagerTest extends FunSuite with Matchers with GivenWhenThen {
       header = Some(true),
       partitions = Vector("part1", "part2"),
       table = Some("some_table"),
-      saveMode = Some(SaveMode.Overwrite),
+      writeStrategy = Some(WriteStrategy.Overwrite),
       createExternalTable = true,
       readOptions = Map(
         "r_option_1" -> "r_value_1",

@@ -1,6 +1,6 @@
 package it.trenzalore.tools.spark.source
 
-import it.trenzalore.tools.spark.source.SaveMode.{ Append, ErrorIfExists, Ignore, Overwrite, OverwritePartitions, OverwriteWhenSuccessful }
+import it.trenzalore.tools.spark.source.WriteStrategy.{ Append, ErrorIfExists, Ignore, Overwrite, OverwritePartitions, OverwriteWhenSuccessful }
 import it.trenzalore.tools.spark.source.reader.SourceReader
 import it.trenzalore.tools.spark.source.writer.SourceWriter
 import it.trenzalore.tools.utils.logging.Logging
@@ -65,10 +65,10 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
   def save[T](ds: Dataset[T])(implicit spark: SparkSession, fs: FileSystem): Unit = {
     logger.info(s"Saving source '$sourceName' with configuration '$sourceConfig'")
 
-    if (sourceConfig.saveMode.isEmpty)
+    if (sourceConfig.writeStrategy.isEmpty)
       throw new IllegalArgumentException("'saveMode' should be provided to save a dataset")
 
-    sourceConfig.saveMode.get match {
+    sourceConfig.writeStrategy.get match {
       case OverwriteWhenSuccessful ⇒ saveWithOverwriteWhenSuccessful(ds)
       case OverwritePartitions     ⇒ saveWithOverwritePartitions(ds)
       case _                       ⇒ SourceWriter.getWriter(sourceConfig.format).save(ds, sourceConfig)
@@ -109,7 +109,7 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
   )(implicit fs: FileSystem): Unit = {
     val tmpSourceConfig = sourceConfig.copy(
       path = sourceConfig.path + "_" + Random.nextString(20),
-      saveMode = Some(Overwrite)
+      writeStrategy = Some(Overwrite)
     )
     try {
       SourceWriter.getWriter(sourceConfig.format).save(ds, tmpSourceConfig)
@@ -179,7 +179,7 @@ class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
       throw new IllegalArgumentException("'table' should be provided to use 'createExternalTable'")
 
     val table = sourceConfig.table.get
-    val saveMode = sourceConfig.saveMode.get
+    val saveMode = sourceConfig.writeStrategy.get
     val tableExists = spark.catalog.tableExists(table)
 
     if (saveMode == Overwrite || saveMode == OverwriteWhenSuccessful) {

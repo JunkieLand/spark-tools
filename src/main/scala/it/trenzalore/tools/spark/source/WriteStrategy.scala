@@ -5,7 +5,7 @@ import enumeratum.Enum
 import enumeratum.EnumEntry
 import org.apache.spark.sql
 
-sealed trait SaveMode extends EnumEntry {
+sealed trait WriteStrategy extends EnumEntry {
 
   def toSparkSaveMode: org.apache.spark.sql.SaveMode
 
@@ -15,9 +15,9 @@ sealed trait SaveMode extends EnumEntry {
   * Like the original Spark SaveMode, it is used to specify the write strategy when saving a dataset. However,
   * it adds a few nice strategies.
   */
-object SaveMode extends Enum[SaveMode] {
+object WriteStrategy extends Enum[WriteStrategy] {
 
-  val values: immutable.IndexedSeq[SaveMode] = findValues
+  val values: immutable.IndexedSeq[WriteStrategy] = findValues
 
   /**
     * Overwrite mode means that if any data exists in the directory, it will be deleted and overwritten by the new one.
@@ -25,7 +25,7 @@ object SaveMode extends Enum[SaveMode] {
     * will be deleted <strong>before</strong> starting writing the new one, so data will be unavailable until finishing to write the
     * new one.
     */
-  case object Overwrite extends SaveMode {
+  case object Overwrite extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = sql.SaveMode.Overwrite
   }
 
@@ -33,7 +33,7 @@ object SaveMode extends Enum[SaveMode] {
     * Append mode means that if any data exists in the directory, the new data will be appended leaving the old data
     * untouched. This Append has exactly the same behavior than the Spark SaveMode.Append mode.
     */
-  case object Append extends SaveMode {
+  case object Append extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = sql.SaveMode.Append
   }
 
@@ -41,7 +41,7 @@ object SaveMode extends Enum[SaveMode] {
     * Ignore mode means that if any data exists in the directory, nothing new will be written leaving the old data
     * untouched. This Ignore has exactly the same behavior than the Spark SaveMode.Ignore mode.
     */
-  case object Ignore extends SaveMode {
+  case object Ignore extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = sql.SaveMode.Ignore
   }
 
@@ -49,7 +49,7 @@ object SaveMode extends Enum[SaveMode] {
     * ErrorIfExists means that if any data exists in the directory, nothing new will be written and an exception
     * will be thrown. This ErrorIfExists has exactly the same behavior than the Spark SaveMode.ErrorIfExists mode.
     */
-  case object ErrorIfExists extends SaveMode {
+  case object ErrorIfExists extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = sql.SaveMode.ErrorIfExists
   }
 
@@ -59,7 +59,7 @@ object SaveMode extends Enum[SaveMode] {
     * directory, then <strong>after</strong> writing is finished, the old data will be deleted and the new one moved to its place.
     * The unavailability duration is thus reduced to almost nothing.
     */
-  case object OverwriteWhenSuccessful extends SaveMode {
+  case object OverwriteWhenSuccessful extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = throw new IllegalAccessException("OverwriteWhenSuccessful has no Spark equivalent save mode")
   }
 
@@ -72,10 +72,10 @@ object SaveMode extends Enum[SaveMode] {
     * Be careful when writing many different partitions since this works by writing first in a temporary directory,
     * then deleting each matching old partition and moving the new one. It might over stress the name node.
     */
-  case object OverwritePartitions extends SaveMode {
+  case object OverwritePartitions extends WriteStrategy {
     def toSparkSaveMode: sql.SaveMode = throw new IllegalAccessException("OverwriteWhenSuccessful has no Spark equivalent save mode")
   }
 
-  def apply(str: String): SaveMode = withNameInsensitive(str)
+  def apply(str: String): WriteStrategy = withNameInsensitive(str)
 
 }

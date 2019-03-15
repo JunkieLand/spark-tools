@@ -30,7 +30,7 @@ object CsvWriter extends SourceWriter {
       .partitionBy(sourceConfig.partitions: _*)
       .option("delimiter", sourceConfig.delimiter.get)
       .option("header", sourceConfig.header.get.toString)
-      .mode(sourceConfig.saveMode.get.toSparkSaveMode)
+      .mode(sourceConfig.writeStrategy.get.toSparkSaveMode)
       .csv(sourceConfig.path)
   }
 

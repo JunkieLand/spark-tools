@@ -40,7 +40,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withOverwrite",
       format = FileFormat.Json,
       createExternalTable = false,
-      saveMode = Some(SaveMode.Overwrite)
+      writeStrategy = Some(WriteStrategy.Overwrite)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -63,7 +63,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       createExternalTable = false,
       header = Some(true),
       delimiter = Some("|"),
-      saveMode = Some(SaveMode.Overwrite)
+      writeStrategy = Some(WriteStrategy.Overwrite)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -88,7 +88,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withAppend",
       format = FileFormat.Parquet,
       createExternalTable = false,
-      saveMode = Some(SaveMode.Append)
+      writeStrategy = Some(WriteStrategy.Append)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -109,7 +109,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withAppendOldDudes",
       format = FileFormat.ORC,
       createExternalTable = false,
-      saveMode = Some(SaveMode.Append)
+      writeStrategy = Some(WriteStrategy.Append)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -135,7 +135,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withIgnoreDudes",
       format = FileFormat.ORC,
       createExternalTable = false,
-      saveMode = Some(SaveMode.Ignore)
+      writeStrategy = Some(WriteStrategy.Ignore)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -156,7 +156,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withIgnoreDudes",
       format = FileFormat.ORC,
       createExternalTable = false,
-      saveMode = Some(SaveMode.Ignore)
+      writeStrategy = Some(WriteStrategy.Ignore)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -181,7 +181,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withErrorIfNotExistsDudes",
       format = FileFormat.Json,
       createExternalTable = false,
-      saveMode = Some(SaveMode.ErrorIfExists)
+      writeStrategy = Some(WriteStrategy.ErrorIfExists)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -202,7 +202,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withErrorIfExistsDudes",
       format = FileFormat.Json,
       createExternalTable = false,
-      saveMode = Some(SaveMode.ErrorIfExists)
+      writeStrategy = Some(WriteStrategy.ErrorIfExists)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -226,7 +226,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withOverwriteWhenSuccessful",
       format = FileFormat.Json,
       createExternalTable = false,
-      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+      writeStrategy = Some(WriteStrategy.OverwriteWhenSuccessful)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -249,7 +249,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       createExternalTable = false,
       header = Some(true),
       delimiter = Some("|"),
-      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+      writeStrategy = Some(WriteStrategy.OverwriteWhenSuccessful)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -275,7 +275,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Json,
       createExternalTable = false,
       partitions = Vector("name", "age"),
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -297,7 +297,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Json,
       createExternalTable = false,
       partitions = Vector("name", "age"),
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -326,7 +326,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       path = "/tmp/sourceiotest/withOverwriteNoPartitions",
       format = FileFormat.Json,
       createExternalTable = false,
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -347,7 +347,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Json,
       createExternalTable = false,
       partitions = Vector("name"),
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -374,7 +374,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withOverwriteNoExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.Overwrite)
+      writeStrategy = Some(WriteStrategy.Overwrite)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -396,7 +396,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withOverwriteExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.Overwrite)
+      writeStrategy = Some(WriteStrategy.Overwrite)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -422,7 +422,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withAppendNoExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.Append)
+      writeStrategy = Some(WriteStrategy.Append)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -444,7 +444,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withAppendExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.Append)
+      writeStrategy = Some(WriteStrategy.Append)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -472,7 +472,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withIgnoreNoExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.Ignore)
+      writeStrategy = Some(WriteStrategy.Ignore)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -494,7 +494,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withErrorIfExistsExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.ErrorIfExists)
+      writeStrategy = Some(WriteStrategy.ErrorIfExists)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -516,7 +516,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withOverwriteWhenSuccessfulNoExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+      writeStrategy = Some(WriteStrategy.OverwriteWhenSuccessful)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -538,7 +538,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       format = FileFormat.Parquet,
       createExternalTable = true,
       table = Some("withOverwriteWhenSuccessfulExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.OverwriteWhenSuccessful)
+      writeStrategy = Some(WriteStrategy.OverwriteWhenSuccessful)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -565,7 +565,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       partitions = Seq("name", "age"),
       createExternalTable = true,
       table = Some("withOverwritePartitionsNoExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
@@ -588,7 +588,7 @@ class SourceIOTest extends FunSuite with Matchers with GivenWhenThen with Before
       partitions = Seq("name", "age"),
       createExternalTable = true,
       table = Some("test.withOverwritePartitionsExistingCreateExternalTable"),
-      saveMode = Some(SaveMode.OverwritePartitions)
+      writeStrategy = Some(WriteStrategy.OverwritePartitions)
     )
 
     val sourceIO = new SourceIO("dude", sourceConfig)
