@@ -19,7 +19,7 @@ import scala.util.Random
   * @param sourceName The name of the data source. Only used in logs.
   * @param sourceConfig A data source description allowing to read, save or delete it.
   */
-class SourceIO(sourceName: String, sourceConfig: SourceConfig) extends Logging {
+class SourceIO(sourceName: String, val sourceConfig: SourceConfig) extends Logging {
 
   /**
     * Reads any data source described in a SourceConfig as a dataset.
