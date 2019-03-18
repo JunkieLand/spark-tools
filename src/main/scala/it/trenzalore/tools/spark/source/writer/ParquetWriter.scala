@@ -1,14 +1,13 @@
 package it.trenzalore.tools.spark.source.writer
 
 import it.trenzalore.tools.spark.source.SourceConfig
-import org.apache.spark.sql.{ DataFrame, Dataset }
-
-import scala.reflect.runtime.universe.TypeTag
+import it.trenzalore.tools.utils.logging.Logging
+import org.apache.spark.sql.Dataset
 
 /**
   * ParquetWriter allows to save a dataset to a Parquet file according to a source described in a SourceConfig.
   */
-object ParquetWriter extends SourceWriter {
+object ParquetWriter extends SourceWriter with Logging {
 
   /**
     * Save a dataset to a Parquet file according to a source described in a SourceConfig.
@@ -21,6 +20,8 @@ object ParquetWriter extends SourceWriter {
     * @tparam T
     */
   override def save[T](ds: Dataset[T], sourceConfig: SourceConfig): Unit = {
+    logger.info(s"Will save dataset in Parquet with the following configuration : $sourceConfig")
+
     ds
       .write
       .options(sourceConfig.writeOptions)

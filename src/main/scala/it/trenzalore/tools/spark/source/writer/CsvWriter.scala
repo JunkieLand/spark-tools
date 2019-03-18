@@ -1,12 +1,13 @@
 package it.trenzalore.tools.spark.source.writer
 
 import it.trenzalore.tools.spark.source.SourceConfig
+import it.trenzalore.tools.utils.logging.Logging
 import org.apache.spark.sql.Dataset
 
 /**
   * CsvWriter allows to save a dataset to a CSV file according to a source described in a SourceConfig.
   */
-object CsvWriter extends SourceWriter {
+object CsvWriter extends SourceWriter with Logging {
 
   /**
     * Save a dataset to a CSV file according to a source described in a SourceConfig.
@@ -21,6 +22,8 @@ object CsvWriter extends SourceWriter {
     * @throws IllegalArgumentException If 'delimiter' or 'header' are not provided
     */
   def save[T](ds: Dataset[T], sourceConfig: SourceConfig): Unit = {
+    logger.info(s"Will save dataset in CSV with the following configuration : $sourceConfig")
+
     if (sourceConfig.delimiter.isEmpty || sourceConfig.header.isEmpty)
       throw new IllegalArgumentException("'delimiter' and 'header' should be provided to write CSV")
 

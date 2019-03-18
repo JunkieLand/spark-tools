@@ -90,17 +90,23 @@ class SourceIO(sourceName: String, val sourceConfig: SourceConfig) extends Loggi
   }
 
   private def saveWithOverwriteWhenSuccessful[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+    logger.info(s"Will save dataset with OverwriteWhenSuccessful strategy")
     saveWithIntermediateTempDir(ds, replaceDirectory)
   }
 
   private def saveWithOverwritePartitions[T](ds: Dataset[T])(implicit fs: FileSystem): Unit = {
+    logger.info(s"Will save dataset with OverwritePartitions strategy")
+
     if (sourceConfig.partitions.isEmpty)
       throw new IllegalArgumentException("Partitions are required to use OverwritePartitions save mode.")
 
-    if (sourceDirNonEmptyWithNoPartitions)
+    if (sourceDirNonEmptyWithNoPartitions) {
+      logger.info(s"Since target directory ${sourceConfig.path} is non empty, but contains no partitions, will use OverwriteWhenSuccessful strategy")
       saveWithOverwriteWhenSuccessful(ds)
-    else
+    } else {
+      logger.info(s"Will first write in an intermediate directory, then move partitions to the target directory ${sourceConfig.path}")
       saveWithIntermediateTempDir(ds, replacePartitions)
+    }
   }
 
   private def saveWithIntermediateTempDir[T](
@@ -108,7 +114,7 @@ class SourceIO(sourceName: String, val sourceConfig: SourceConfig) extends Loggi
     moveStrategy: (Path, Path) ⇒ Unit
   )(implicit fs: FileSystem): Unit = {
     val tmpSourceConfig = sourceConfig.copy(
-      path = sourceConfig.path + "_" + Random.nextString(20),
+      path = sourceConfig.path + "_" + Random.nextLong(),
       writeStrategy = Some(Overwrite)
     )
     try {
@@ -120,11 +126,19 @@ class SourceIO(sourceName: String, val sourceConfig: SourceConfig) extends Loggi
   }
 
   private def replaceDirectory(fromDir: Path, toDir: Path)(implicit fs: FileSystem): Unit = {
+    logger.info(s"Will replace directory $toDir by $fromDir")
+    logger.debug(s"Deleting directory $toDir")
     fs.delete(toDir, true)
-    fs.rename(fromDir, toDir)
+    logger.debug(s"Ensure parent directory exists : ${toDir.getParent}")
+    fs.mkdirs(toDir.getParent)
+    logger.debug(s"Moving directory $fromDir to $toDir")
+    val isRenameSuccessful = fs.rename(fromDir, toDir)
+    logger.debug(s"Is moving directory $fromDir to $toDir successful : $isRenameSuccessful")
   }
 
   private def replacePartitions(fromDir: Path, toDir: Path)(implicit fs: FileSystem): Unit = {
+    logger.info(s"Will replace partitions in directory $toDir by those from $fromDir")
+
     val iterator = fs.listFiles(fromDir, true)
     val partitionPaths = mutable.Set[Path]()
 
@@ -137,13 +151,16 @@ class SourceIO(sourceName: String, val sourceConfig: SourceConfig) extends Loggi
       }
     }
 
-    partitionPaths
-      .flatMap { partitionPath ⇒
-        getPartitionSubPath(fromDir, partitionPath).map(subPath ⇒ partitionPath -> subPath)
-      }.foreach {
-        case (fromPartitionPath, fromPartitionSubPath) ⇒
-          replaceDirectory(fromPartitionPath, new Path(toDir, fromPartitionSubPath))
-      }
+    val partitionSubPaths = partitionPaths.flatMap { partitionPath ⇒
+      getPartitionSubPath(fromDir, partitionPath).map(subPath ⇒ partitionPath -> subPath)
+    }
+
+    logger.info(s"Will replace the following partitions : ${partitionSubPaths.map(_._2).mkString(", ")}")
+
+    partitionSubPaths.foreach {
+      case (fromPartitionPath, fromPartitionSubPath) ⇒
+        replaceDirectory(fromPartitionPath, new Path(toDir, fromPartitionSubPath))
+    }
   }
 
   private def getPartitionSubPath(rootDir: Path, fullDir: Path): Option[Path] = {

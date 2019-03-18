@@ -1,6 +1,7 @@
 package it.trenzalore.tools.spark.source.reader
 
 import it.trenzalore.tools.spark.source.SourceConfig
+import it.trenzalore.tools.utils.logging.Logging
 import it.trenzalore.tools.utils.spark.SparkUtils.schemaOf
 import org.apache.spark.sql.{ DataFrame, Dataset, SparkSession }
 import it.trenzalore.tools.utils.spark.SparkUtils.implicits._
@@ -10,7 +11,7 @@ import scala.reflect.runtime.universe.TypeTag
 /**
   * JsonReader allows to read a Json file from a source described in a SourceConfig.
   */
-object JsonReader extends SourceReader {
+object JsonReader extends SourceReader with Logging {
 
   /**
     * Reads a Json file as a DataFrame from a source described in a SourceConfig.
@@ -20,6 +21,8 @@ object JsonReader extends SourceReader {
     * @return The dataframe containing the parsed Json file
     */
   override def loadDf(sourceConfig: SourceConfig)(implicit spark: SparkSession): DataFrame = {
+    logger.info(s"Will read Json dataframe according to the following configuration : $sourceConfig")
+
     spark
       .read
       .options(sourceConfig.readOptions)
@@ -39,6 +42,8 @@ object JsonReader extends SourceReader {
     * @return The dataset containing the parsed Json file
     */
   override def loadDs[T <: Product: TypeTag](sourceConfig: SourceConfig)(implicit spark: SparkSession): Dataset[T] = {
+    logger.info(s"Will read Json dataset according to the following configuration : $sourceConfig")
+
     spark
       .read
       .options(sourceConfig.readOptions)
