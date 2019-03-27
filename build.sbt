@@ -21,6 +21,7 @@ lazy val sparkTools = Project("spark-tools", new File("."))
   )
   .settings(scalariformPluginSettings: _*)
   .settings(releaseSettings: _*)
+  .settings(publishSettings: _*)
   .settings(
     resolvers ++= Dependencies.resolvers,
     coursierResolvers ++= Dependencies.resolvers,
@@ -88,4 +89,19 @@ lazy val releaseSettings = Seq(
   ),
   releaseTagName := s"v${runtimeVersion.value}-${name.value.toUpperCase().replace("-", "_")}",
   releaseCommitMessage := s"Setting version to ${runtimeVersion.value} for module ${name.value}"
+)
+
+
+lazy val publishSettings = Seq(
+  credentials += Credentials(Path.userHome / ".sbt" / "credentials"),
+  publishTo := {
+    val nexus = "https://repo.renault-digital.com/repository/"
+    if (version.value.trim.endsWith("SNAPSHOT"))
+      Some("snapshots" at nexus + "trc-snapshots")
+    else
+      Some("releases" at nexus + "trc-releases")
+  },
+  publishArtifact in (Compile, packageSrc) := true, // we want to publish the source of the packages
+  publishArtifact in (Compile, packageDoc) := true, // we want to publish the javadoc of the packages
+  publishArtifact in (Test, packageSrc) := false
 )
