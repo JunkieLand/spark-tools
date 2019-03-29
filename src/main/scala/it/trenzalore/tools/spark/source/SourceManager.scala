@@ -23,7 +23,7 @@ class SourceManager(config: Config) {
 
   import SourceManager._
 
-  val sources: Map[String, SourceIO] = parseSourceConfigs(config).map { case (k, v) ⇒ k -> new SourceIO(k, v) }
+  lazy val sources: Map[String, SourceIO] = parseSourceConfigs(config).map { case (k, v) ⇒ k -> new SourceIO(k, v) }
 
   def apply(sourceName: String): SourceIO = sources(sourceName)
 
